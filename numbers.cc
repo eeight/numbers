@@ -10,15 +10,14 @@
 #include <vector>
 
 #include <boost/format.hpp>
+#include <boost/function.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/timer.hpp>
 #include <boost/tuple/tuple.hpp>
 
 /* TODO
  * cache miss
  * branch mispredict
- * syscall
- * mutex lock/unlock
- * boost::function call
  * malloc/free
  * read 1mb sequentially from disk (read and mmap)
  * write 1mb sequentially to disk (write and mmap)
@@ -117,27 +116,50 @@ private:
     for (size_t i = 0; i != SAMPLE_RUN_SIZE;  ++i)
 
 /*
- * Measures overhead of making a virtual call.
- *
  * Definitions of the classes are moved to separate translation unit
  * in order to prevent compiler of being too smart and inlining the call.
  */
 STAT(virtual_call, 1024*1024*10) {
     const virt::Base &base = virt::Derived();
+
     SAMPLE() {
        base.f();
     }
 }
 
 /*
- * Measure overhead of making a syscall.
- *
  * Use write() with invalid argument, so it returns almost
  * immediately and time spend in actual syscall body is insignificant.
  */
-STAT(syscall, 1024*1020) {
+STAT(syscall, 1024*1024) {
     SAMPLE() {
-        write(10, 0, 0);
+        // Currently (until gcc 4.5 arrives), there is no way to
+        // disable
+        // "warning: ignoring return value of `...', declared
+        // with attribute warn_unused_result"
+        //
+        // So as a workaround we here declare unused variable.
+        int a __attribute__((unused));
+        a = write(10, 0, 0);
+    }
+}
+
+STAT(mutex, 1024*1024*4) {
+    boost::mutex mutex;
+
+    SAMPLE() {
+        boost::mutex::scoped_lock lock(mutex);
+    }
+}
+
+void boost_function_test() {
+}
+
+STAT(boost_function, 1024*1024*10) {
+    boost::function<void ()> functor(&boost_function_test);
+
+    SAMPLE() {
+        functor();
     }
 }
 
