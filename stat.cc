@@ -5,6 +5,8 @@
 #include <numeric>
 #include <stdexcept>
 
+#include <iostream>
+
 namespace {
 
 template <class T>
@@ -32,6 +34,7 @@ Stat StatCollector::getStat(size_t sampleRunSize) const {
     double average = std::accumulate(
             samples_.begin(), samples_.end(), 0.0)/samples_.size();
     double variation = 0.0;
+
 
     for (size_t i = 0; i != samples_.size(); ++i) {
         variation += sqr(samples_[i] - average);

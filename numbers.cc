@@ -1,51 +1,36 @@
 #include "stat.hh"
 
-#include "branch_mispredict.hh"
-#include "virtual.hh"
+#include "separate.hh"
 
+#include <stdio.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <iterator>
+#include <sstream>
 #include <vector>
 
 #include <boost/format.hpp>
 #include <boost/function.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 #include <boost/timer.hpp>
 #include <boost/tuple/tuple.hpp>
 
 /* TODO
  * cache miss
- * malloc/free
  * read 1mb sequentially from disk (read and mmap)
  * write 1mb sequentially to disk (write and mmap)
- * create thread
  * sync one cache line in L1 caches
  * int + * /
  * float + * /
  * double + * /
- * copy 1mb vector
  * table-based switch
- * sort 1mb vector
- * stable_sort 1mb vector
- * sort 1mb list * traverse 1mb vector
- * traverse 1mb deque
- * traverse 1mb list
- * traverse 1mb map
- * traverse 1mb set
- * shared_ptr copy
- * shared_ptr deref
- * __sync_bool_compare_and_swap
- * lexical_cast<string>(int)
- * lexical_cast<int>(string)
- * sprintf
- * sscanf
- * boost::format
- * cancat strings
- * output 2 strings to stringstream and obtain str()
  */
 
 namespace {
@@ -165,7 +150,6 @@ private:
     }
 
 /*
- * There is a bit of black magic going here.
  * We want to define sampling piece of function with one use of SAMPLE().
  * In order to achieve this, before target code is ran, TimerPitcher
  * object is beging created. It throws elapsed time in destructor thus
@@ -198,12 +182,12 @@ private:
  * in order to prevent compiler of being too smart and inlining the call.
  */
 STAT_DIFF(virtual_call) {
-    const virt::Derived &base = virt::DDerived();
+    const Derived &d = DDerived();
 
     SAMPLE() {
-        virt::f(&base);
+        callDerivedF(&d);
     } AND() {
-        virt::g(&base);
+        doNothingWithDerived(&d);
     }
 }
 
@@ -243,47 +227,341 @@ STAT(boost_function) {
     }
 }
 
+#if 0
 STAT_DIFF(branch_mispredict) {
     SAMPLE() {
-        if (__builtin_expect(branch_mispredict::returns1(), 0)) {
-            branch_mispredict::f();
+        if (__builtin_expect(return1(), 0)) {
+            doNothing1();
         } else {
-            branch_mispredict::g();
+            doNothing2();
         }
     } AND() {
-        if (__builtin_expect(branch_mispredict::returns1(), 1)) {
-            branch_mispredict::f();
+        if (__builtin_expect(return1(), 1)) {
+            doNothing1();
         } else {
-            branch_mispredict::g();
+            doNothing2();
         }
+    }
+}
+#endif
+
+STAT(malloc_free_1kb) {
+    SAMPLE() {
+        free(malloc(1024));
+    }
+}
+
+STAT(malloc_free_1mb) {
+    SAMPLE() {
+        free(malloc(1024*1024));
+    }
+}
+
+void create_thread_worker() {
+}
+
+STAT(create_thread) {
+    SAMPLE() {
+        boost::thread thread(&create_thread_worker);
+        thread.join();
+    }
+}
+
+const size_t COPY_SIZE = 1024*10;
+
+STAT(copy_vector_10k) {
+    std::vector<int> v;
+    std::fill_n(std::back_inserter(v), COPY_SIZE, 42);
+
+    SAMPLE() {
+        copyVector(v);
+    }
+}
+
+STAT(copy_deque_10k) {
+    std::deque<int> d;
+    std::fill_n(std::back_inserter(d), COPY_SIZE, 42);
+
+    SAMPLE() {
+        copyDeque(d);
+    }
+}
+
+STAT(copy_list_10k) {
+    std::list<int> l;
+    std::fill_n(std::back_inserter(l), COPY_SIZE, 42);
+
+    SAMPLE() {
+        copyList(l);
+    }
+}
+
+STAT(copy_set_10k) {
+    std::set<int> s;
+    for (size_t i = 0; i != COPY_SIZE; ++i) {
+        s.insert(i);
+    }
+
+    SAMPLE() {
+        copySet(s);
+    }
+}
+
+STAT(copy_map_10k) {
+    std::map<int, int> m;
+    for (size_t i = 0; i != COPY_SIZE; ++i) {
+        m[i] = i;
+    }
+
+    SAMPLE() {
+        copyMap(m);
+    }
+}
+
+const size_t TRAVERSE_SIZE = 1024*100;
+
+STAT(traverse_vector_100k) {
+    std::vector<int> v;
+    std::fill_n(std::back_inserter(v), TRAVERSE_SIZE, 42);
+
+    SAMPLE() {
+        for (std::vector<int>::const_iterator i = v.begin();
+                i != v.end(); ++i) {
+            doNothingWithParam(*i);
+        }
+    }
+}
+
+STAT(traverse_vector_index_100k) {
+    std::vector<int> v;
+    std::fill_n(std::back_inserter(v), TRAVERSE_SIZE, 42);
+
+    SAMPLE() {
+        for (size_t i = 0; i != v.size(); ++i) {
+            doNothingWithParam(v[i]);
+        }
+    }
+}
+
+STAT(traverse_deque_100k) {
+    std::deque<int> d;
+    std::fill_n(std::back_inserter(d), TRAVERSE_SIZE, 42);
+
+    SAMPLE() {
+        for (std::deque<int>::const_iterator i = d.begin();
+                i != d.end(); ++i) {
+            doNothingWithParam(*i);
+        }
+    }
+}
+
+STAT(traverse_list_100k) {
+    std::list<int> l;
+    std::fill_n(std::back_inserter(l), TRAVERSE_SIZE, 42);
+
+    SAMPLE() {
+        for (std::list<int>::const_iterator i = l.begin();
+                i != l.end(); ++i) {
+            doNothingWithParam(*i);
+        }
+    }
+}
+
+STAT(traverse_set_100k) {
+    std::set<int> s;
+    for (size_t i = 0; i != TRAVERSE_SIZE; ++i) {
+        s.insert(i);
+    }
+
+    SAMPLE() {
+        for (std::set<int>::const_iterator i = s.begin();
+                i != s.end(); ++i) {
+            doNothingWithParam(*i);
+        }
+    }
+}
+
+STAT(traverse_map_100k) {
+    std::map<int, int> m;
+    for (size_t i = 0; i != TRAVERSE_SIZE; ++i) {
+        m[i] = i;
+    }
+
+    SAMPLE() {
+        for (std::map<int, int>::const_iterator i = m.begin();
+                i != m.end(); ++i) {
+            doNothingWithParam(i->second);
+        }
+    }
+}
+
+const size_t SORT_SIZE = 1024*10;
+
+STAT(sort_10k_vector) {
+    std::vector<int> v;
+
+    SAMPLE() {
+        v.clear();
+        for (size_t i = 0; i != SORT_SIZE; ++i) {
+            v.push_back(rand());
+        }
+        std::sort(v.begin(), v.end());
+    }
+}
+
+STAT(stable_sort_10k_vector) {
+    std::vector<int> v;
+
+    SAMPLE() {
+        v.clear();
+        for (size_t i = 0; i != SORT_SIZE; ++i) {
+            v.push_back(rand());
+        }
+        std::stable_sort(v.begin(), v.end());
+    }
+}
+
+STAT(sort_10k_deque) {
+    std::deque<int> d;
+
+    SAMPLE() {
+        d.clear();
+        for (size_t i = 0; i != SORT_SIZE; ++i) {
+            d.push_back(rand());
+        }
+        std::sort(d.begin(), d.end());
+    }
+}
+
+STAT(sort_10k_list) {
+    std::list<int> l;
+
+    SAMPLE() {
+        l.clear();
+        for (size_t i = 0; i != SORT_SIZE; ++i) {
+            l.push_back(rand());
+        }
+        l.sort();
+    }
+}
+
+STAT(shared_ptr_copy) {
+    boost::shared_ptr<Base> sharedPtr(new Derived);
+
+    SAMPLE() {
+        copySharedPtr(sharedPtr);
+    }
+}
+
+STAT(shared_ptr_deref) {
+    boost::shared_ptr<Derived> sharedPtr(new Derived);
+
+    SAMPLE() {
+        doNothingWithDerived(&*sharedPtr);
+    }
+}
+
+STAT(cas) {
+    int a = 1, b = 2;
+
+    SAMPLE() {
+        __sync_bool_compare_and_swap(&a, 1, b);
+    }
+
+    doNothingWithParam(a);
+    doNothingWithParam(b);
+}
+
+const int INT_VALUE = 2255;
+const char STRING_VALUE[] = "2255";
+
+STAT(lexical_cast_int_string) {
+    int a = INT_VALUE;
+
+    SAMPLE() {
+        doNothingWithParam(boost::lexical_cast<std::string>(a));
+    }
+}
+
+STAT(lexical_cast_string_int) {
+    std::string s = STRING_VALUE;
+
+    SAMPLE() {
+        doNothingWithParam(boost::lexical_cast<int>(s));
+    }
+}
+
+STAT(boost_format) {
+    int a = INT_VALUE;
+
+    SAMPLE() {
+        doNothingWithParam((boost::format("%d")%a).str());
+    }
+}
+
+STAT(sprintf) {
+    int a = INT_VALUE;
+    char buffer[1024];
+
+    SAMPLE() {
+        doNothingWithParam(snprintf(buffer, sizeof(buffer), "%d", a));
+    }
+}
+
+STAT(sscanf) {
+    const char *s = STRING_VALUE;
+    int a;
+
+    SAMPLE() {
+        doNothingWithParam(sscanf(s, "%d", &a));
+    }
+    doNothingWithParam(a);
+}
+
+const char FIRST_STRING[] = "firstfirstfirstfirstfirstfirst";
+const char SECOND_STRING[] = "secondsecondsecondsecondsecondsecond";
+
+STAT(string_concat) {
+    std::string a = FIRST_STRING;
+    std::string b = SECOND_STRING;
+
+    SAMPLE() {
+        doNothingWithParam(a + b);
+    }
+}
+
+STAT(string_stream_concat) {
+    std::string a = FIRST_STRING;
+    std::string b = SECOND_STRING;
+
+    SAMPLE() {
+        std::stringstream ss;
+
+        ss << a << b;
+        doNothingWithParam(ss.str());
     }
 }
 
 void collectAndPrintStat(const StatSample &statSample) {
     const size_t SAMPLE_COUNT = 100;
-    const size_t MAX_SAMPLE_RUN_SIZE = 16777216;
-    size_t sampleRunSize = 1024/2;
+    const double MAX_RUNNING_TIME = 60;
+
+    size_t sampleRunSize = 4;
     Stat stat;
+    double runningTime;
 
     do {
         sampleRunSize *= 2;
-        if (stat.average() > 0) {
-            std::cerr << boost::format(
-                    "avg: %fμs\tstddev: %fμs\t stddev/avg: %f is too bad\n") %
-                (stat.average()*1e9) %
-                (stat.standardDeviation()*1e9) %
-                (stat.standardDeviation() / stat.average());
-        }
-        std::cerr << boost::format("Using sample run of %d for %s\n") %
-            sampleRunSize % statSample.name();
+        boost::timer time;
         stat = statSample.collectStat(sampleRunSize, SAMPLE_COUNT);
+        runningTime = time.elapsed();
     } while ((stat.average() == 0 ||
             stat.average()*MAX_RELATIVE_STANDARD_DEVIATION <
                 stat.standardDeviation()) &&
-            sampleRunSize < MAX_SAMPLE_RUN_SIZE);
+            runningTime < MAX_RUNNING_TIME);
 
     std::cout << boost::format(
-            "%s:\taverage: %fμs;\tstandard deviation: %fμs\n") %
+            "\"%s\": (%f, %f),\n") % 
         statSample.name() %
         (stat.average()*1e9) %
         (stat.standardDeviation()*1e9);
@@ -291,7 +569,9 @@ void collectAndPrintStat(const StatSample &statSample) {
 
 int main()
 {
+    std::cout << "{" << std::endl;;
     std::for_each(g_StatInfos.begin(), g_StatInfos.end(),
             std::ptr_fun(&collectAndPrintStat));
+    std::cout << "}" << std::endl;;
     return 0;
 }

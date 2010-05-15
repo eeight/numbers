@@ -1,0 +1,61 @@
+\documentclass[a4paper,12pt,russian]{article}
+
+\usepackage{geometry}
+\geometry{a4paper,top=2cm,bottom=2cm,left=2cm,right=2cm}
+
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+\newcommand{\code}[1]{\textsf{#1}}
+
+\begin{document}
+\begin{titlepage}
+
+\vskip 14em
+\begin{tabular}{l | l c}
+ & & Относительное\\
+Вид & Среднее время & стандартное отклонение \\
+\hline \\
+Вызов виртуальной функции & %(virtual_call) \\
+Системный вызов & %(syscall) \\
+Захват и освобождение мьютекса & %(mutex) \\
+Вызов \code{boost::function} & %(boost_function) \\
+% Ошибка предсказания ветвления & %(branch_mispredict) \\
+Выделение и освобождение 1кб памяти & %(malloc_free_1kb) \\
+Выделение и освобождение 1мб памяти & %(malloc_free_1mb) \\
+Создание потока & %(create_thread) \\
+Копирование контейнера из 1000 элементов &  & \\
+\qquad \code{std::vector<int>} & %(copy_vector_10k) \\
+\qquad \code{std::deque<int>} & %(copy_deque_10k) \\
+\qquad \code{std::list<int>} & %(copy_list_10k) \\
+\qquad \code{std::set<int>} & %(copy_set_10k) \\
+\qquad \code{std::map<int, int>} из 1000 элементов & %(copy_map_10k) \\
+Перебор 10000 элементов в контейнере &  & \\
+\qquad \code{std::vector<int>} & %(traverse_vector_100k) \\
+\qquad \code{std::deque<int>} & %(traverse_deque_100k) \\
+\qquad \code{std::list<int>} & %(traverse_list_100k) \\
+\qquad \code{std::set<int>} & %(traverse_set_100k) \\
+\qquad \code{std::map<int, int>} & %(traverse_map_100k) \\
+Сортировка контейнера из 1000 элементов & & \\
+\qquad \code{std::vector<int>} (устойчивая) & %(stable_sort_10k_vector) \\
+\qquad \code{std::vector<int>} & %(sort_10k_vector) \\
+\qquad \code{std::deque<int>} & %(sort_10k_deque) \\
+\qquad \code{std::list<int>} & %(sort_10k_list) \\
+Копирование \code{boost::shared\_ptr} & %(shared_ptr_copy) \\
+Разыменование \code{boost::shared\_ptr} & %(shared_ptr_deref) \\
+\code{\_\_sync\_bool\_compare\_and\_swap} & %(cas) \\
+\code{boost::lexical\_cast<int>(std::string)} & %(lexical_cast_int_string) \\
+\code{boost::lexical\_cast<std::string>(int)} & %(lexical_cast_string_int) \\
+\code{str(boost::format("\%d") \% a)} & %(boost_format) \\
+\code{sprintf("\%d")} & %(sprintf) \\
+\code{sscanf("\%d")} & %(sscanf) \\
+Конкатенация двух \code{std::string} & %(string_concat) \\
+Конкатенация двух \code{std::string} через \code{std::stringstream} & %(string_stream_concat) \\
+\end{tabular}
+\end{titlepage}
+\end{document}
