@@ -50,71 +50,72 @@
 
 namespace {
 
+const double MAX_RELATIVE_STANDARD_DEVIATION = 0.15;
+
 class StatSample {
 public:
-    StatSample(const char *name, size_t sampleRunSize) :
-        name_(name), sampleRunSize_(sampleRunSize)
+    StatSample(const char *name) : name_(name)
     {}
 
     virtual ~StatSample() {}
 
-    virtual Stat collectStat(size_t sampleCount) const = 0;
+    virtual Stat collectStat(
+            size_t sampleRunSize, size_t sampleCount) const = 0;
 
     const char *name() const { return name_; }
-    size_t sampleRunSize() const { return sampleRunSize_; }
 
 private:
     const char *name_;
-    size_t sampleRunSize_;
 };
+
+typedef double (*Sampler)(size_t sampleRunSize);
 
 class PlainStatSample : public StatSample {
 public:
-    PlainStatSample(const char *name, size_t sampleRunSize,
-            double (*sampler)()) :
-        StatSample(name, sampleRunSize), sampler_(sampler)
+    PlainStatSample(const char *name, Sampler sampler) :
+        StatSample(name), sampler_(sampler)
     {}
 
-    Stat collectStat(size_t sampleCount) const {
+    Stat collectStat(size_t sampleRunSize, size_t sampleCount) const {
         StatCollector statCollector;
 
         for (size_t i = 0; i != sampleCount; ++i) {
-            statCollector.addSample(sampler_());
+            statCollector.addSample(sampler_(sampleRunSize));
         }
 
-        return statCollector.getStat(sampleRunSize());
+        return statCollector.getStat(sampleRunSize);
     }
 
 private:
-    double (*sampler_)();
+    Sampler sampler_;
 };
 
 class DifferenceStatSample : public StatSample {
 public:
-    DifferenceStatSample(const char *name, size_t sampleRunSize,
-            double (*firstSampler)(), double (*secondSampler)()) :
-        StatSample(name, sampleRunSize),
+    DifferenceStatSample(const char *name,
+            Sampler firstSampler, Sampler secondSampler) :
+        StatSample(name),
         firstSampler_(firstSampler), secondSampler_(secondSampler)
     {}
 
-    Stat collectStat(size_t sampleCount) const {
+    Stat collectStat(size_t sampleRunSize, size_t sampleCount) const {
         StatCollector firstStatCollector;
         StatCollector secondStatCollector;
 
         for (size_t i = 0; i != sampleCount; ++i) {
-            firstStatCollector.addSample(firstSampler_());
+            firstStatCollector.addSample(firstSampler_(sampleRunSize));
         }
         for (size_t i = 0; i != sampleCount; ++i) {
-            secondStatCollector.addSample(secondSampler_());
+            secondStatCollector.addSample(secondSampler_(sampleRunSize));
         }
 
-        return firstStatCollector.getStat(sampleRunSize()) -
-            secondStatCollector.getStat(sampleRunSize());
+        return firstStatCollector.getStat(sampleRunSize) -
+            secondStatCollector.getStat(sampleRunSize);
     }
 
 private:
-    double (*firstSampler_)();
-    double (*secondSampler_)();
+    Sampler firstSampler_;
+    Sampler secondSampler_;
 };
 
 boost::ptr_vector<StatSample> g_StatInfos;
@@ -144,17 +145,17 @@ private:
 } // namespace
 
 #define STAT_PRELUDE(name) \
-    template <size_t SAMPLE_RUN_SIZE, bool IS_FIRST> \
-    void stat_aux_##name();
+    template <bool IS_FIRST> \
+    void stat_aux_##name(size_t sampleRunSize);
 
 #define STAT_FIN(name) \
-    template <size_t SAMPLE_RUN_SIZE, bool IS_FIRST> \
-    void stat_aux_##name()
+    template <bool IS_FIRST> \
+    void stat_aux_##name(size_t sampleRunSize)
 
-#define STAT_WRAPPER(name, aux_name, samples, isFirst) \
-    double stat_##name() { \
+#define STAT_WRAPPER(name, aux_name, isFirst) \
+    double stat_##name(size_t sampleRunSize) { \
         try { \
-            stat_aux_##aux_name<samples, isFirst>(); \
+            stat_aux_##aux_name<isFirst>(sampleRunSize); \
         } \
         catch (double time) { \
             return time; \
@@ -171,36 +172,38 @@ private:
  * returing result of sampling. Target sampling function is wrapped in
  * auxiliary function catching the value and returning it the normal way.
  */
-#define STAT(name, samples) \
+#define STAT(name) \
     STAT_PRELUDE(name) \
-    STAT_WRAPPER(name, name, samples, true) \
+    STAT_WRAPPER(name, name, true) \
     StatSampleRegistrator statRegistrator_##name( \
-            new PlainStatSample(#name, samples, &stat_##name)); \
+            new PlainStatSample(#name, &stat_##name)); \
     STAT_FIN(name)
 
-#define STAT_DIFF(name, samples) \
+#define STAT_DIFF(name) \
     STAT_PRELUDE(name) \
-    STAT_WRAPPER(first_##name, name, samples, true) \
-    STAT_WRAPPER(second_##name, name, samples, false) \
+    STAT_WRAPPER(first_##name, name, true) \
+    STAT_WRAPPER(second_##name, name, false) \
     StatSampleRegistrator statRegistrator_##name(new DifferenceStatSample( \
-                #name, samples, &stat_first_##name, &stat_second_##name)); \
+                #name, &stat_first_##name, &stat_second_##name)); \
     STAT_FIN(name)
 
 #define SAMPLE() \
     if (const TimerPitcher &timerPitcher __attribute__((unused)) = TimerPitcher(IS_FIRST)) \
-        for (size_t i = 0; i != SAMPLE_RUN_SIZE;  ++i)
+        for (size_t i = 0; i != sampleRunSize;  ++i)
 
-#define AND() else for (size_t i = 0; i != SAMPLE_RUN_SIZE;  ++i)
+#define AND() else for (size_t i = 0; i != sampleRunSize;  ++i)
 
 /*
- * Definitions of the classes are moved to separate translation unit
+ * Definitions of the classes are moved to separate compilation unit
  * in order to prevent compiler of being too smart and inlining the call.
  */
-STAT(virtual_call, 1024*1024*10) {
-    const virt::Base &base = virt::Derived();
+STAT_DIFF(virtual_call) {
+    const virt::Derived &base = virt::DDerived();
 
     SAMPLE() {
-       base.f();
+        virt::f(&base);
+    } AND() {
+        virt::g(&base);
     }
 }
 
@@ -208,7 +211,7 @@ STAT(virtual_call, 1024*1024*10) {
  * Use write() with invalid argument, so it returns almost
  * immediately and time spend in actual syscall body is insignificant.
  */
-STAT(syscall, 1024*1024) {
+STAT(syscall) {
     SAMPLE() {
         // Currently (until gcc 4.5 arrives), there is no way to
         // disable
@@ -221,7 +224,7 @@ STAT(syscall, 1024*1024) {
     }
 }
 
-STAT(mutex, 1024*1024*4) {
+STAT(mutex) {
     boost::mutex mutex;
 
     SAMPLE() {
@@ -232,7 +235,7 @@ STAT(mutex, 1024*1024*4) {
 void boost_function_test() {
 }
 
-STAT(boost_function, 1024*1024*10) {
+STAT(boost_function) {
     boost::function<void ()> functor(&boost_function_test);
 
     SAMPLE() {
@@ -240,15 +243,14 @@ STAT(boost_function, 1024*1024*10) {
     }
 }
 
-STAT_DIFF(branch_mispredict, 1024*1024*10) {
+STAT_DIFF(branch_mispredict) {
     SAMPLE() {
         if (__builtin_expect(branch_mispredict::returns1(), 0)) {
             branch_mispredict::f();
         } else {
             branch_mispredict::g();
         }
-    }
-    AND() {
+    } AND() {
         if (__builtin_expect(branch_mispredict::returns1(), 1)) {
             branch_mispredict::f();
         } else {
@@ -259,10 +261,29 @@ STAT_DIFF(branch_mispredict, 1024*1024*10) {
 
 void collectAndPrintStat(const StatSample &statSample) {
     const size_t SAMPLE_COUNT = 100;
-    Stat stat = statSample.collectStat(SAMPLE_COUNT);
+    const size_t MAX_SAMPLE_RUN_SIZE = 16777216;
+    size_t sampleRunSize = 1024/2;
+    Stat stat;
+
+    do {
+        sampleRunSize *= 2;
+        if (stat.average() > 0) {
+            std::cerr << boost::format(
+                    "avg: %fμs\tstddev: %fμs\t stddev/avg: %f is too bad\n") %
+                (stat.average()*1e9) %
+                (stat.standardDeviation()*1e9) %
+                (stat.standardDeviation() / stat.average());
+        }
+        std::cerr << boost::format("Using sample run of %d for %s\n") %
+            sampleRunSize % statSample.name();
+        stat = statSample.collectStat(sampleRunSize, SAMPLE_COUNT);
+    } while ((stat.average() == 0 ||
+            stat.average()*MAX_RELATIVE_STANDARD_DEVIATION <
+                stat.standardDeviation()) &&
+            sampleRunSize < MAX_SAMPLE_RUN_SIZE);
 
     std::cout << boost::format(
-            "%s:\taverage: %fns;\tstandard deviation: %fns\n") %
+            "%s:\taverage: %fμs;\tstandard deviation: %fμs\n") %
         statSample.name() %
         (stat.average()*1e9) %
         (stat.standardDeviation()*1e9);

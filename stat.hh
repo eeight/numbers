@@ -5,6 +5,10 @@
 
 class Stat {
 public:
+    Stat() :
+        average_(0), standardDeviation_(0)
+    {}
+
     Stat(double average, double standardDeviation) :
         average_(average), standardDeviation_(standardDeviation)
     {}

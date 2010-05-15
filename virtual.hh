@@ -16,6 +16,10 @@ struct DDerived : Derived {
     void f() const;
 };
 
+void f(const Derived *derived);
+
+void g(const Derived *derived);
+
 
 } // namespace virt
 
