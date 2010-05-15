@@ -1,4 +1,4 @@
 This is a benchmark that measures speed of some common operations in C++.
-It can take about 15 minutes to run because some values there are tricky get statistically sound.
+It can take about 15 minutes to run because some values there are tricky to get statistically sound.
 You could generate poster in .pdf format by simply running `make poster'.
 There is only russian version of template.tex for now.
