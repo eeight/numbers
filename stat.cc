@@ -14,12 +14,17 @@ T sqr(T x) {
 
 } // namespace
 
-void Stat::addSample(double value) {
+Stat operator -(const Stat &lhs, const Stat &rhs) {
+    return Stat(
+            lhs.average() - rhs.average(),
+            lhs.standardDeviation() + rhs.standardDeviation());
+}
+
+void StatCollector::addSample(double value) {
     samples_.push_back(value);
 }
 
-std::pair<double, double> Stat::getAverageAndStandardDeviation(
-            size_t sampleRunSize) const {
+Stat StatCollector::getStat(size_t sampleRunSize) const {
     if (samples_.empty()) {
         throw std::logic_error("Cannot compute stats with no samples");
     }
@@ -32,9 +37,7 @@ std::pair<double, double> Stat::getAverageAndStandardDeviation(
         variation += sqr(samples_[i] - average);
     }
 
-    double standardDeviation = std::sqrt(
-            variation/samples_.size());
+    double standardDeviation = std::sqrt(variation/samples_.size());
 
-    return std::make_pair(
-            average/sampleRunSize, standardDeviation/sampleRunSize);
+    return Stat(average/sampleRunSize, standardDeviation/sampleRunSize);
 }

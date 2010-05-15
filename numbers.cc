@@ -1,5 +1,6 @@
 #include "stat.hh"
 
+#include "branch_mispredict.hh"
 #include "virtual.hh"
 
 #include <unistd.h>
@@ -11,13 +12,13 @@
 
 #include <boost/format.hpp>
 #include <boost/function.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/timer.hpp>
 #include <boost/tuple/tuple.hpp>
 
 /* TODO
  * cache miss
- * branch mispredict
  * malloc/free
  * read 1mb sequentially from disk (read and mmap)
  * write 1mb sequentially to disk (write and mmap)
@@ -47,42 +48,120 @@
  * output 2 strings to stringstream and obtain str()
  */
 
-class StatInfo {
+namespace {
+
+class StatSample {
 public:
-    StatInfo(const char *name, size_t sampleRunSize, 
-            double (*sampler)()) :
-        name_(name), sampleRunSize_(sampleRunSize), sampler_(sampler)
+    StatSample(const char *name, size_t sampleRunSize) :
+        name_(name), sampleRunSize_(sampleRunSize)
     {}
+
+    virtual ~StatSample() {}
+
+    virtual Stat collectStat(size_t sampleCount) const = 0;
 
     const char *name() const { return name_; }
     size_t sampleRunSize() const { return sampleRunSize_; }
-    double (*sampler() const)() { return sampler_; }
 
 private:
     const char *name_;
     size_t sampleRunSize_;
+};
+
+class PlainStatSample : public StatSample {
+public:
+    PlainStatSample(const char *name, size_t sampleRunSize,
+            double (*sampler)()) :
+        StatSample(name, sampleRunSize), sampler_(sampler)
+    {}
+
+    Stat collectStat(size_t sampleCount) const {
+        StatCollector statCollector;
+
+        for (size_t i = 0; i != sampleCount; ++i) {
+            statCollector.addSample(sampler_());
+        }
+
+        return statCollector.getStat(sampleRunSize());
+    }
+
+private:
     double (*sampler_)();
 };
 
-std::vector<StatInfo> g_StatInfos;
+class DifferenceStatSample : public StatSample {
+public:
+    DifferenceStatSample(const char *name, size_t sampleRunSize,
+            double (*firstSampler)(), double (*secondSampler)()) :
+        StatSample(name, sampleRunSize),
+        firstSampler_(firstSampler), secondSampler_(secondSampler)
+    {}
 
-struct StatInfoRegistrator {
-    StatInfoRegistrator(const StatInfo &statInfo) {
-        g_StatInfos.push_back(statInfo);
+    Stat collectStat(size_t sampleCount) const {
+        StatCollector firstStatCollector;
+        StatCollector secondStatCollector;
+
+        for (size_t i = 0; i != sampleCount; ++i) {
+            firstStatCollector.addSample(firstSampler_());
+        }
+        for (size_t i = 0; i != sampleCount; ++i) {
+            secondStatCollector.addSample(secondSampler_());
+        }
+
+        return firstStatCollector.getStat(sampleRunSize()) -
+            secondStatCollector.getStat(sampleRunSize());
+    }
+
+private:
+    double (*firstSampler_)();
+    double (*secondSampler_)();
+};
+
+boost::ptr_vector<StatSample> g_StatInfos;
+
+struct StatSampleRegistrator {
+    StatSampleRegistrator(StatSample *statSample) {
+        g_StatInfos.push_back(statSample);
     }
 };
 
 class TimerPitcher {
 public:
-    operator bool() const { return false; }
-    void useMe() const  {}
+    TimerPitcher(bool value) : value_(value)
+    {}
+
     ~TimerPitcher() {
         throw time_.elapsed();
     }
 
+    operator bool() const { return value_; }
+
 private:
+    bool value_;
     boost::timer time_;
 };
+
+} // namespace
+
+#define STAT_PRELUDE(name) \
+    template <size_t SAMPLE_RUN_SIZE, bool IS_FIRST> \
+    void stat_aux_##name();
+
+#define STAT_FIN(name) \
+    template <size_t SAMPLE_RUN_SIZE, bool IS_FIRST> \
+    void stat_aux_##name()
+
+#define STAT_WRAPPER(name, aux_name, samples, isFirst) \
+    double stat_##name() { \
+        try { \
+            stat_aux_##aux_name<samples, isFirst>(); \
+        } \
+        catch (double time) { \
+            return time; \
+        } \
+        throw std::runtime_error( \
+                "Expected sampler to return elapsed time via throw"); \
+    }
 
 /*
  * There is a bit of black magic going here.
@@ -93,27 +172,25 @@ private:
  * auxiliary function catching the value and returning it the normal way.
  */
 #define STAT(name, samples) \
-    template <size_t SAMPLE_RUN_SIZE> \
-    void stat_aux_##name(); \
-    double stat_##name() { \
-        try { \
-            stat_aux_##name<samples>(); \
-        } \
-        catch (double time) { \
-            return time; \
-        } \
-        return 0; \
-    } \
-    StatInfoRegistrator statRegistrator_##name( \
-            StatInfo(#name, samples, &stat_##name)); \
-    template <size_t SAMPLE_RUN_SIZE> \
-    void stat_aux_##name()
+    STAT_PRELUDE(name) \
+    STAT_WRAPPER(name, name, samples, true) \
+    StatSampleRegistrator statRegistrator_##name( \
+            new PlainStatSample(#name, samples, &stat_##name)); \
+    STAT_FIN(name)
+
+#define STAT_DIFF(name, samples) \
+    STAT_PRELUDE(name) \
+    STAT_WRAPPER(first_##name, name, samples, true) \
+    STAT_WRAPPER(second_##name, name, samples, false) \
+    StatSampleRegistrator statRegistrator_##name(new DifferenceStatSample( \
+                #name, samples, &stat_first_##name, &stat_second_##name)); \
+    STAT_FIN(name)
 
 #define SAMPLE() \
-    if (const TimerPitcher &timerPitcher = TimerPitcher()) { \
-        timerPitcher.useMe(); \
-    } else \
-    for (size_t i = 0; i != SAMPLE_RUN_SIZE;  ++i)
+    if (const TimerPitcher &timerPitcher __attribute__((unused)) = TimerPitcher(IS_FIRST)) \
+        for (size_t i = 0; i != SAMPLE_RUN_SIZE;  ++i)
+
+#define AND() else for (size_t i = 0; i != SAMPLE_RUN_SIZE;  ++i)
 
 /*
  * Definitions of the classes are moved to separate translation unit
@@ -163,20 +240,32 @@ STAT(boost_function, 1024*1024*10) {
     }
 }
 
-void collectAndPrintStat(const StatInfo &statInfo) {
-    Stat stat;
-    const size_t SAMPLE_COUNT = 100;
-
-    for (size_t i = 0; i != SAMPLE_COUNT; ++i) {
-        stat.addSample(statInfo.sampler()());
+STAT_DIFF(branch_mispredict, 1024*1024*10) {
+    SAMPLE() {
+        if (__builtin_expect(branch_mispredict::returns1(), 0)) {
+            branch_mispredict::f();
+        } else {
+            branch_mispredict::g();
+        }
     }
+    AND() {
+        if (__builtin_expect(branch_mispredict::returns1(), 1)) {
+            branch_mispredict::f();
+        } else {
+            branch_mispredict::g();
+        }
+    }
+}
 
-    double average, standardDeviation;
-    boost::tie(average, standardDeviation) =
-        stat.getAverageAndStandardDeviation(statInfo.sampleRunSize());
+void collectAndPrintStat(const StatSample &statSample) {
+    const size_t SAMPLE_COUNT = 100;
+    Stat stat = statSample.collectStat(SAMPLE_COUNT);
+
     std::cout << boost::format(
             "%s:\taverage: %fns;\tstandard deviation: %fns\n") %
-        statInfo.name() % (average*1e9) % (standardDeviation*1e9);
+        statSample.name() %
+        (stat.average()*1e9) %
+        (stat.standardDeviation()*1e9);
 }
 
 int main()

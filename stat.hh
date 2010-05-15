@@ -2,13 +2,27 @@
 #define STAT_H
 
 #include <vector>
-#include <utility>
 
 class Stat {
 public:
+    Stat(double average, double standardDeviation) :
+        average_(average), standardDeviation_(standardDeviation)
+    {}
+
+    double average() const { return average_; }
+    double standardDeviation() const { return standardDeviation_; }
+
+private:
+    double average_, standardDeviation_;
+};
+
+// Assumes that lhs and rhs are not correlated.
+Stat operator -(const Stat &lhs, const Stat &rhs);
+
+class StatCollector {
+public:
     void addSample(double value);
-    std::pair<double, double> getAverageAndStandardDeviation(
-            size_t sampleRunSize) const;
+    Stat getStat(size_t sampleRunSize) const;
 
 private:
     std::vector<double> samples_;

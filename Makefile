@@ -3,7 +3,7 @@ CXXFLAGS= -Wall -Wextra -Werror -g -O2
 %.o:%.cc
 	$(CXX) -c $^ -o $@ $(CXXFLAGS) -Wa,-ahl=$@.s
 
-numbers: numbers.o stat.o virtual.o
+numbers: numbers.o stat.o virtual.o branch_mispredict.o
 	$(CXX) $^ -o $@ $(CXXFLAGS) -lpthread
 
 clean:
