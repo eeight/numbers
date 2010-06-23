@@ -12,8 +12,8 @@ stat.txt: numbers
 clean:
 	-rm *.o *.o.s numbers stat.txt
 
-poster: stat.txt
-	./subst.py stats.txt < template.tex > poster.tex
+poster: stat.txt template.tex
+	./subst.py stat.txt < template.tex > poster.tex
 	pdflatex poster.tex
 	-rm poster.aux  poster.log poster.tex  poster.toc
 

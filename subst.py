@@ -12,7 +12,7 @@ def main():
     input = sys.stdin.read()
 
     for name, stat in template.iteritems():
-        input = input.replace("%%(%s)" % name, "%0.1f~нс & %0.2f\\%% \\" % (stat[0], stat[1]/stat[0]))
+        input = input.replace("%%(%s)" % name, "%0.1f~нс & %0.2f\\%% \\" % (stat[0], 100.0*stat[1]/stat[0]))
 
     print input
 
