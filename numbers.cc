@@ -3,6 +3,7 @@
 #include "separate.hh"
 
 #include <stdio.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -539,6 +540,14 @@ STAT(string_stream_concat) {
 
         ss << a << b;
         doNothingWithParam(ss.str());
+    }
+}
+
+STAT(time) {
+    SAMPLE() {
+        time_t a __attribute__((unused));
+
+        a = time(0);
     }
 }
 
