@@ -576,8 +576,27 @@ void collectAndPrintStat(const StatSample &statSample) {
         (stat.standardDeviation()*1e9);
 }
 
-int main()
+int main(int argc, char **argv)
 {
+    if (argc > 1) {
+        std::string command = argv[1];
+
+        if (command == "list") {
+            for (size_t i = 0; i != g_StatInfos.size(); ++i) {
+                std::cout << g_StatInfos[i].name() << std::endl;
+            }
+            return 0;
+        }
+        for (size_t i = 0; i != g_StatInfos.size(); ++i) {
+            if (command == g_StatInfos[i].name()) {
+                collectAndPrintStat(g_StatInfos[i]);
+                return 0;
+            }
+        }
+
+        std::cerr << "Unknown stat name: " << command << std::endl;
+        return 1;
+    }
     std::cout << "{" << std::endl;;
     std::for_each(g_StatInfos.begin(), g_StatInfos.end(),
             std::ptr_fun(&collectAndPrintStat));
