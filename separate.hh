@@ -44,5 +44,6 @@ void callDerivedF(const Derived *derived);
 
 void doNothingWithDerived(const Derived *derived);
 
+void throwException();
 
 #endif

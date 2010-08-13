@@ -12,6 +12,7 @@
 #include <iterator>
 #include <sstream>
 #include <vector>
+#include <stdexcept>
 
 #include <boost/format.hpp>
 #include <boost/function.hpp>
@@ -548,6 +549,15 @@ STAT(time) {
         time_t a __attribute__((unused));
 
         a = time(0);
+    }
+}
+
+STAT(throw_exception) {
+    SAMPLE() {
+        try {
+            throwException();
+        } catch (const std::exception &) {
+        }
     }
 }
 

@@ -1,5 +1,7 @@
 #include "separate.hh"
 
+#include <stdexcept>
+
 void Base::f() const {}
 void Derived::f() const {}
 void DDerived::f() const {}
@@ -28,3 +30,7 @@ void callDerivedF(const Derived *derived) {
 }
 
 void doNothingWithDerived(const Derived *derived __attribute__((unused))) {}
+
+void throwException() {
+    throw std::runtime_error("You've asked for an exception");
+}
