@@ -1,4 +1,5 @@
 #include "stat.hh"
+#include "timer.hh"
 
 #include "separate.hh"
 
@@ -21,7 +22,6 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
-#include <boost/timer.hpp>
 #include <boost/tuple/tuple.hpp>
 
 /* TODO
@@ -119,14 +119,14 @@ public:
     {}
 
     ~TimerPitcher() {
-        throw time_.elapsed();
+        throw timer_.elapsed();
     }
 
     operator bool() const { return value_; }
 
 private:
     bool value_;
-    boost::timer time_;
+    Timer timer_;
 };
 
 } // namespace
@@ -571,9 +571,9 @@ void collectAndPrintStat(const StatSample &statSample) {
 
     do {
         sampleRunSize *= 2;
-        boost::timer time;
+        Timer timer_;
         stat = statSample.collectStat(sampleRunSize, SAMPLE_COUNT);
-        runningTime = time.elapsed();
+        runningTime = timer_.elapsed();
     } while ((stat.average() == 0 ||
             stat.average()*MAX_RELATIVE_STANDARD_DEVIATION <
                 stat.standardDeviation()) &&
