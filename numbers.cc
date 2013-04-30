@@ -579,7 +579,7 @@ void collectAndPrintStat(const StatSample &statSample) {
     const size_t SAMPLE_COUNT = 100;
     const double MAX_RUNNING_TIME = 60;
 
-    size_t sampleRunSize = 4;
+    size_t sampleRunSize = 4096;
     Stat stat;
     double runningTime;
 
