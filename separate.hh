@@ -1,5 +1,4 @@
-#ifndef SEPARATE_HH
-#define SEPARATE_HH
+#pragma once
 
 #include <deque>
 #include <list>
@@ -36,14 +35,11 @@ void copyMap(std::map<int, int> v);
 
 void copySharedPtr(boost::shared_ptr<Base> ptr);
 
-void doNothingWithParam(int v);
-void doNothingWithParam(const std::string &s);
-void doNothingWithParam(const char *c);
+template <class T>
+void doNothingWithParam(T v);
 
 void callDerivedF(const Derived *derived);
 
 void doNothingWithDerived(const Derived *derived);
 
 void throwException();
-
-#endif

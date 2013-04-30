@@ -1,5 +1,4 @@
-#ifndef STAT_H
-#define STAT_H
+#pragma once
 
 #include <vector>
 
@@ -31,5 +30,3 @@ public:
 private:
     std::vector<double> samples_;
 };
-
-#endif
