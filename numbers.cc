@@ -481,7 +481,7 @@ STAT(lexical_cast_int_string) {
     int a = INT_VALUE;
 
     SAMPLE() {
-        doNothingWithParam(boost::lexical_cast<std::string>(a));
+        doNothingWithParam<const std::string &>(boost::lexical_cast<std::string>(a));
     }
 }
 
@@ -497,7 +497,7 @@ STAT(boost_format) {
     int a = INT_VALUE;
 
     SAMPLE() {
-        doNothingWithParam((boost::format("%d")%a).str());
+        doNothingWithParam<const std::string &>((boost::format("%d")%a).str());
     }
 }
 
@@ -528,7 +528,7 @@ STAT(string_concat) {
     std::string b = SECOND_STRING;
 
     SAMPLE() {
-        doNothingWithParam(a + b);
+        doNothingWithParam<const std::string &>(a + b);
     }
 }
 
@@ -540,7 +540,7 @@ STAT(string_stream_concat) {
         std::stringstream ss;
 
         ss << a << b;
-        doNothingWithParam(ss.str());
+        doNothingWithParam<const std::string &>(ss.str());
     }
 }
 
@@ -560,6 +560,22 @@ STAT(throw_exception) {
         }
     }
 }
+
+#define type_perf(type) \
+STAT(type##_perf) { \
+    SAMPLE() { \
+        doNothingWithParam<type>(return1<type>()*0.5); \
+    } \
+}
+
+typedef long double long_double;
+
+type_perf(float)
+type_perf(double)
+type_perf(long_double)
+type_perf(__float128)
+
+#undef type_perf
 
 void collectAndPrintStat(const StatSample &statSample) {
     const size_t SAMPLE_COUNT = 100;

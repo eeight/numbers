@@ -22,7 +22,8 @@ struct DDerived : Derived {
     void f() const;
 };
 
-int return1();
+template <class T>
+T return1();
 
 void doNothing1();
 void doNothing2();

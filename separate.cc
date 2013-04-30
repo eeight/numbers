@@ -6,9 +6,16 @@ void Base::f() const {}
 void Derived::f() const {}
 void DDerived::f() const {}
 
-int return1() {
+template <class T>
+T return1() {
     return 1;
 }
+
+template int return1<int>();
+template float return1<float>();
+template double return1<double>();
+template long double return1<long double>();
+template __float128 return1<__float128>();
 
 void doNothing1() {}
 void doNothing2() {}
@@ -21,9 +28,16 @@ void copyMap(std::map<int, int> v __attribute__((unused))) {}
 
 void copySharedPtr(boost::shared_ptr<Base> ptr __attribute__((unused))) {}
 
-void doNothingWithParam(int v __attribute__((unused))) {}
-void doNothingWithParam(const std::string &s __attribute__((unused))) {}
-void doNothingWithParam(const char *c __attribute__((unused))) {}
+template <class T>
+void doNothingWithParam(T v __attribute__((unused))) {}
+
+template void doNothingWithParam<int>(int);
+template void doNothingWithParam<const char *>(const char *);
+template void doNothingWithParam<const std::string &>(const std::string &);
+template void doNothingWithParam<float>(float);
+template void doNothingWithParam<double>(double);
+template void doNothingWithParam<long double>(long double);
+template void doNothingWithParam<__float128>(__float128);
 
 void callDerivedF(const Derived *derived) {
     derived->f();
