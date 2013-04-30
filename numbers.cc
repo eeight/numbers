@@ -594,7 +594,7 @@ void collectAndPrintStat(const StatSample &statSample) {
             runningTime < MAX_RUNNING_TIME);
 
     std::cout << boost::format(
-            "\"%s\": (%f, %f),\n") %
+            "\"%s\": [%f, %f],\n") %
         statSample.name() %
         (stat.average()*1e9) %
         (stat.standardDeviation()*1e9);
