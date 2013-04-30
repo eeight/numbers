@@ -229,23 +229,21 @@ STAT(boost_function) {
     }
 }
 
-#if 0
 STAT_DIFF(branch_mispredict) {
     SAMPLE() {
-        if (__builtin_expect(return1(), 0)) {
+        if (__builtin_expect(return1<int>(), 0)) {
             doNothing1();
         } else {
             doNothing2();
         }
     } AND() {
-        if (__builtin_expect(return1(), 1)) {
+        if (__builtin_expect(return1<int>(), 1)) {
             doNothing1();
         } else {
             doNothing2();
         }
     }
 }
-#endif
 
 STAT(malloc_free_1kb) {
     SAMPLE() {
