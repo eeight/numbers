@@ -34,3 +34,7 @@ void doNothingWithDerived(const Derived *derived __attribute__((unused))) {}
 void throwException() {
     throw std::runtime_error("You've asked for an exception");
 }
+
+void* disguisedMalloc(size_t size) {
+    return malloc(size);
+}

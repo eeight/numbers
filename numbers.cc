@@ -249,13 +249,13 @@ STAT_DIFF(branch_mispredict) {
 
 STAT(malloc_free_1kb) {
     SAMPLE() {
-        free(malloc(1024));
+        free(disguisedMalloc(1024));
     }
 }
 
 STAT(malloc_free_1mb) {
     SAMPLE() {
-        free(malloc(1024*1024));
+        free(disguisedMalloc(1024*1024));
     }
 }
 

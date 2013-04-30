@@ -43,3 +43,5 @@ void callDerivedF(const Derived *derived);
 void doNothingWithDerived(const Derived *derived);
 
 void throwException();
+
+void* disguisedMalloc(size_t size);
